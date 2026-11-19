@@ -1,6 +1,8 @@
 from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
+from aiogram.fsm.context import FSMContext
+
 
 import texts
 import keyboards as kb
@@ -18,7 +20,8 @@ async def cmd_start(message: Message):
 
 
 @router.callback_query(F.data == "menu:main")
-async def to_main(call: CallbackQuery):
+async def to_main(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     await call.message.edit_text(
         texts.WELCOME.format(name=call.from_user.first_name),
         reply_markup=kb.main_menu(),
