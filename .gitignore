@@ -4,3 +4,4 @@ bot.log
 __pycache__/
 .idea/
 .venv/
+testdata.py

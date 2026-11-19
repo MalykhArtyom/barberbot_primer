@@ -44,7 +44,8 @@ async def back_to_services(call: CallbackQuery, state: FSMContext):
 
 # ---------- шаг 2: дата ----------
 async def show_dates(call: CallbackQuery, state: FSMContext):
-    dates = await get_available_dates()
+    data = await state.get_data()
+    dates = await get_available_dates(data["service_id"])
     if not dates:
         await call.answer("Нет доступных дат", show_alert=True)
         return
