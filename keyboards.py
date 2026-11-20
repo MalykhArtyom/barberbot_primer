@@ -83,3 +83,34 @@ def confirm_kb() -> InlineKeyboardMarkup:
     kb.button(text="✖️ Отмена", callback_data="menu:main")
     kb.adjust(2)
     return kb.as_markup()
+
+WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+
+
+def my_bookings_kb(bookings: list[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for b in bookings:
+        d = date.fromisoformat(b["date"])
+        kb.button(
+            text=f"{WEEKDAYS_RU[d.weekday()]} {d.strftime('%d.%m')} {b['time']} · {b['service_name']}",
+            callback_data=f"mb:{b['id']}",
+        )
+    kb.button(text="⬅️ В меню", callback_data="menu:main")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def booking_card_kb(booking_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="❌ Отменить запись", callback_data=f"cx:{booking_id}")
+    kb.button(text="⬅️ К моим записям", callback_data="menu:my")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def cancel_confirm_kb(booking_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Да, отменить", callback_data=f"cxy:{booking_id}")
+    kb.button(text="Нет, оставить", callback_data=f"mb:{booking_id}")
+    kb.adjust(2)
+    return kb.as_markup()

@@ -167,3 +167,74 @@ async def create_booking(
         except BaseException:
             await db.rollback()
             raise
+
+MIN_CANCEL_HOURS = 2
+
+
+async def get_user_bookings(user_id: int) -> list[dict]:
+    """Будущие активные записи клиента, ближайшие первыми."""
+    now = now_local()
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT b.id, b.date, b.time, b.client_name, b.phone, "
+            "       s.name AS service_name, s.price, s.duration_min "
+            "FROM bookings b JOIN services s ON s.id = b.service_id "
+            "WHERE b.user_id = ? AND b.status = 'active' AND b.date >= ? "
+            "ORDER BY b.date, b.time",
+            (user_id, now.date().isoformat()),
+        )
+        rows = [dict(r) for r in await cur.fetchall()]
+
+    # отсекаем сегодняшние, которые уже прошли
+    result = []
+    for r in rows:
+        start = datetime.fromisoformat(f"{r['date']} {r['time']}")
+        if start > now:
+            result.append(r)
+    return result
+
+
+async def get_booking(booking_id: int, user_id: int | None = None) -> dict | None:
+    """Одна активная запись. Если передан user_id, проверяется владелец."""
+    query = (
+        "SELECT b.id, b.user_id, b.date, b.time, b.client_name, b.phone, "
+        "       s.name AS service_name, s.price "
+        "FROM bookings b JOIN services s ON s.id = b.service_id "
+        "WHERE b.id = ? AND b.status = 'active'"
+    )
+    params: list = [booking_id]
+    if user_id is not None:
+        query += " AND b.user_id = ?"
+        params.append(user_id)
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(query, params)
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+class CancelTooLate(Exception):
+    """До визита осталось слишком мало времени."""
+
+
+async def cancel_booking(booking_id: int, user_id: int) -> dict | None:
+    """Отмена клиентом. Возвращает запись или None, если её нет/уже отменена."""
+    booking = await get_booking(booking_id, user_id)
+    if not booking:
+        return None
+
+    start = datetime.fromisoformat(f"{booking['date']} {booking['time']}")
+    if start - now_local() < timedelta(hours=MIN_CANCEL_HOURS):
+        raise CancelTooLate
+
+    async with connect() as db:
+        cur = await db.execute(
+            "UPDATE bookings SET status = 'cancelled' "
+            "WHERE id = ? AND user_id = ? AND status = 'active'",
+            (booking_id, user_id),
+        )
+        await db.commit()
+        if cur.rowcount == 0:      # кто-то успел раньше
+            return None
+    return booking

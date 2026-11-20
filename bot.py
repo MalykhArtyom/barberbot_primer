@@ -8,8 +8,8 @@ from aiogram.enums import ParseMode
 
 from config import config
 from db import init_db
-from handlers import menu, booking, admin
 
+from handlers import menu, booking, my_bookings, admin
 
 async def main():
     logging.basicConfig(
@@ -32,6 +32,7 @@ async def main():
     dp.include_router(menu.router)
     dp.include_router(booking.router)
     dp.include_router(admin.router)
+    dp.include_router(my_bookings.router)
 
     await dp.start_polling(bot)
 
