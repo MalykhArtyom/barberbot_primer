@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -8,16 +9,28 @@ from aiogram.enums import ParseMode
 
 from config import config
 from db import init_db
+from handlers import (
+    menu, booking, my_bookings,
+    admin, admin_services, admin_schedule,
+    errors, fallback,
+)
 from reminders import reminder_loop
-from handlers import menu, booking, my_bookings, admin, admin_services, admin_schedule
 
-async def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        handlers=[logging.FileHandler("bot.log", encoding="utf-8"),
-                  logging.StreamHandler()],
+
+def setup_logging() -> None:
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    file_handler = RotatingFileHandler(
+        "bot.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
     )
+    file_handler.setFormatter(fmt)
+    console = logging.StreamHandler()
+    console.setFormatter(fmt)
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, console])
+
+
+async def main() -> None:
+    setup_logging()
+    log = logging.getLogger("bot")
 
     await init_db()
 
@@ -29,14 +42,17 @@ async def main():
     )
 
     dp = Dispatcher()
-    dp.include_router(admin.router)
+    dp.include_router(errors.router)
     dp.include_router(menu.router)
     dp.include_router(booking.router)
     dp.include_router(my_bookings.router)
+    dp.include_router(admin.router)
     dp.include_router(admin_services.router)
     dp.include_router(admin_schedule.router)
+    dp.include_router(fallback.router)   # всегда последним
 
     reminders_task = asyncio.create_task(reminder_loop(bot))
+    log.info("Бот запущен")
     try:
         await dp.start_polling(bot)
     finally:

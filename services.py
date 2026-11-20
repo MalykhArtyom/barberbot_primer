@@ -1,10 +1,10 @@
-from db import connect
 from datetime import date, datetime, timedelta
-
 from zoneinfo import ZoneInfo
-from config import config
 
 import aiosqlite
+
+from config import config
+from db import connect
 
 TZ = ZoneInfo(config.timezone)
 SLOT_STEP_MIN = 30   # шаг сетки слотов

@@ -1,11 +1,10 @@
 from aiogram import Router, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, CallbackQuery
 
-
-import texts
 import keyboards as kb
+import texts
 from services import get_active_services
 
 router = Router()

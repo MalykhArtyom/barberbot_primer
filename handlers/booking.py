@@ -1,3 +1,4 @@
+import html
 import logging
 import re
 from datetime import date
@@ -14,7 +15,6 @@ from services import (
     get_available_dates, get_free_slots,
     create_booking, SlotTaken, LimitReached,
 )
-import html
 
 router = Router()
 log = logging.getLogger(__name__)
