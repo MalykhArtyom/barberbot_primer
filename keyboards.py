@@ -1,6 +1,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from datetime import date
+from datetime import date, timedelta
+
 
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
@@ -113,4 +114,66 @@ def cancel_confirm_kb(booking_id: int) -> InlineKeyboardMarkup:
     kb.button(text="Да, отменить", callback_data=f"cxy:{booking_id}")
     kb.button(text="Нет, оставить", callback_data=f"mb:{booking_id}")
     kb.adjust(2)
+    return kb.as_markup()
+
+def admin_menu_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📅 Сегодня", callback_data="adm:today")
+    kb.button(text="📆 Завтра", callback_data="adm:tomorrow")
+    kb.button(text="🗓 Другая дата", callback_data="adm:dates")
+    kb.adjust(2, 1)
+    return kb.as_markup()
+
+
+def admin_day_kb(day: date, bookings: list[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for b in bookings:
+        kb.button(
+            text=f"{b['time']} · {b['client_name']} · {b['service_name']}",
+            callback_data=f"adm:b:{b['id']}",
+        )
+    kb.adjust(1)
+    prev_d = day - timedelta(days=1)
+    next_d = day + timedelta(days=1)
+    kb.row(
+        InlineKeyboardButton(text="◀️", callback_data=f"adm:day:{prev_d.isoformat()}"),
+        InlineKeyboardButton(text="🗓 Дата", callback_data="adm:dates"),
+        InlineKeyboardButton(text="▶️", callback_data=f"adm:day:{next_d.isoformat()}"),
+    )
+    kb.row(InlineKeyboardButton(text="⬅️ Админ-меню", callback_data="adm:menu"))
+    return kb.as_markup()
+
+
+def admin_dates_kb(days: list[date], counts: dict[str, int]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for d in days:
+        n = counts.get(d.isoformat(), 0)
+        label = f"{WEEKDAYS[d.weekday()]} {d.strftime('%d.%m')}"
+        if n:
+            label += f" · {n}"
+        kb.button(text=label, callback_data=f"adm:day:{d.isoformat()}")
+    kb.adjust(3)
+    kb.row(InlineKeyboardButton(text="⬅️ Админ-меню", callback_data="adm:menu"))
+    return kb.as_markup()
+
+
+def admin_card_kb(booking_id: int, day_iso: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="❌ Отменить запись", callback_data=f"adm:cx:{booking_id}")
+    kb.button(text="⬅️ К списку дня", callback_data=f"adm:day:{day_iso}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def admin_cancel_confirm_kb(booking_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Да, отменить и уведомить", callback_data=f"adm:cxy:{booking_id}")
+    kb.button(text="Нет", callback_data=f"adm:b:{booking_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def admin_back_to_day_kb(day_iso: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ К списку дня", callback_data=f"adm:day:{day_iso}")
     return kb.as_markup()

@@ -238,3 +238,44 @@ async def cancel_booking(booking_id: int, user_id: int) -> dict | None:
         if cur.rowcount == 0:      # кто-то успел раньше
             return None
     return booking
+
+async def get_bookings_by_date(day: date) -> list[dict]:
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT b.id, b.time, b.client_name, b.phone, "
+            "       s.name AS service_name, s.duration_min "
+            "FROM bookings b JOIN services s ON s.id = b.service_id "
+            "WHERE b.date = ? AND b.status = 'active' "
+            "ORDER BY b.time",
+            (day.isoformat(),),
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_booking_counts(start: date, days: int) -> dict[str, int]:
+    end = start + timedelta(days=days - 1)
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT date, COUNT(*) FROM bookings "
+            "WHERE status = 'active' AND date BETWEEN ? AND ? GROUP BY date",
+            (start.isoformat(), end.isoformat()),
+        )
+        return {d: n for d, n in await cur.fetchall()}
+
+
+async def admin_cancel_booking(booking_id: int) -> dict | None:
+    """Отмена админом: без ограничения по времени. None, если уже отменена."""
+    booking = await get_booking(booking_id)
+    if not booking:
+        return None
+    async with connect() as db:
+        cur = await db.execute(
+            "UPDATE bookings SET status = 'cancelled' "
+            "WHERE id = ? AND status = 'active'",
+            (booking_id,),
+        )
+        await db.commit()
+        if cur.rowcount == 0:
+            return None
+    return booking

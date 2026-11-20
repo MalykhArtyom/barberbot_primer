@@ -29,9 +29,9 @@ async def main():
     )
 
     dp = Dispatcher()
+    dp.include_router(admin.router)
     dp.include_router(menu.router)
     dp.include_router(booking.router)
-    dp.include_router(admin.router)
     dp.include_router(my_bookings.router)
 
     await dp.start_polling(bot)
