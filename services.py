@@ -152,11 +152,17 @@ async def create_booking(
                 if not (new_end <= start or new_start >= start + d):
                     raise SlotTaken
 
+            start_dt = datetime.combine(day, datetime.strptime(time_, "%H:%M").time())
+            until = start_dt - now_local()
+            r24 = int(until <= timedelta(hours=24))
+            r2 = int(until <= timedelta(hours=2))
+
             cur = await db.execute(
                 "INSERT INTO bookings "
-                "(user_id, service_id, date, time, client_name, phone) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, service_id, day.isoformat(), time_, name, phone),
+                "(user_id, service_id, date, time, client_name, phone, "
+                " reminded_24h, reminded_2h) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, service_id, day.isoformat(), time_, name, phone, r24, r2),
             )
             booking_id = cur.lastrowid
             await db.commit()
@@ -414,3 +420,34 @@ async def remove_day_off(day: date) -> None:
     async with connect() as db:
         await db.execute("DELETE FROM days_off WHERE date = ?", (day.isoformat(),))
         await db.commit()
+
+_REMINDER_COLUMNS = {"24h": "reminded_24h", "2h": "reminded_2h"}
+
+
+async def get_pending_reminders() -> list[dict]:
+    """Активные записи на сегодня и завтра, по которым ещё есть неотправленные напоминания."""
+    today = now_local().date()
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT b.id, b.user_id, b.date, b.time, "
+            "       b.reminded_24h, b.reminded_2h, s.name AS service_name "
+            "FROM bookings b JOIN services s ON s.id = b.service_id "
+            "WHERE b.status = 'active' AND b.date BETWEEN ? AND ? "
+            "  AND (b.reminded_24h = 0 OR b.reminded_2h = 0)",
+            (today.isoformat(), (today + timedelta(days=1)).isoformat()),
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def claim_reminder(booking_id: int, kind: str) -> bool:
+    """Атомарно «занимает» напоминание. True, если это сделали мы (можно отправлять)."""
+    column = _REMINDER_COLUMNS[kind]
+    async with connect() as db:
+        cur = await db.execute(
+            f"UPDATE bookings SET {column} = 1 "
+            f"WHERE id = ? AND status = 'active' AND {column} = 0",
+            (booking_id,),
+        )
+        await db.commit()
+        return cur.rowcount == 1

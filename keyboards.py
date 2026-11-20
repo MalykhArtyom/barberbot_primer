@@ -179,3 +179,11 @@ def admin_back_to_day_kb(day_iso: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="⬅️ К списку дня", callback_data=f"adm:day:{day_iso}")
     return kb.as_markup()
+
+def reminder_kb(booking_id: int, allow_cancel: bool) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="👍 Приду", callback_data=f"rem:ok:{booking_id}")
+    if allow_cancel:
+        kb.button(text="❌ Отменить", callback_data=f"cx:{booking_id}")
+    kb.adjust(2)
+    return kb.as_markup()

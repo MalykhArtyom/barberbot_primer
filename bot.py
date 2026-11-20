@@ -8,7 +8,7 @@ from aiogram.enums import ParseMode
 
 from config import config
 from db import init_db
-
+from reminders import reminder_loop
 from handlers import menu, booking, my_bookings, admin, admin_services, admin_schedule
 
 async def main():
@@ -36,7 +36,12 @@ async def main():
     dp.include_router(admin_services.router)
     dp.include_router(admin_schedule.router)
 
-    await dp.start_polling(bot)
+    reminders_task = asyncio.create_task(reminder_loop(bot))
+    try:
+        await dp.start_polling(bot)
+    finally:
+        reminders_task.cancel()
+        await bot.session.close()
 
 
 if __name__ == "__main__":

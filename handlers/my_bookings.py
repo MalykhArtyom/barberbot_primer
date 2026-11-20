@@ -100,3 +100,11 @@ async def do_cancel(call: CallbackQuery, bot: Bot):
             await bot.send_message(admin_id, text)
         except Exception:
             log.exception("Не удалось уведомить админа %s", admin_id)
+
+@router.callback_query(F.data.startswith("rem:ok:"))
+async def reminder_ok(call: CallbackQuery):
+    await call.message.edit_text(
+        call.message.html_text + "\n\n✅ Отлично, ждём тебя!",
+        reply_markup=None,
+    )
+    await call.answer()
