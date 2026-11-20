@@ -121,7 +121,9 @@ def admin_menu_kb() -> InlineKeyboardMarkup:
     kb.button(text="📅 Сегодня", callback_data="adm:today")
     kb.button(text="📆 Завтра", callback_data="adm:tomorrow")
     kb.button(text="🗓 Другая дата", callback_data="adm:dates")
-    kb.adjust(2, 1)
+    kb.button(text="💈 Услуги", callback_data="as:list")
+    kb.button(text="⏰ Расписание", callback_data="ash:list")
+    kb.adjust(2, 1, 2)
     return kb.as_markup()
 
 

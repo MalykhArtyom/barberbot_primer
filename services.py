@@ -279,3 +279,138 @@ async def admin_cancel_booking(booking_id: int) -> dict | None:
         if cur.rowcount == 0:
             return None
     return booking
+
+# ---------- услуги (админ) ----------
+_SERVICE_FIELDS = {"name": "name", "price": "price", "duration": "duration_min"}
+
+
+async def get_all_services() -> list[dict]:
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT id, name, duration_min, price, is_active "
+            "FROM services ORDER BY id"
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_service_any(service_id: int) -> dict | None:
+    """Услуга независимо от того, включена она или нет."""
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT id, name, duration_min, price, is_active "
+            "FROM services WHERE id = ?",
+            (service_id,),
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+
+
+async def add_service(name: str, price: int, duration: int) -> int:
+    async with connect() as db:
+        cur = await db.execute(
+            "INSERT INTO services (name, duration_min, price) VALUES (?, ?, ?)",
+            (name, duration, price),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_service(service_id: int, field: str, value) -> None:
+    column = _SERVICE_FIELDS[field]  # только значения из белого списка
+    async with connect() as db:
+        await db.execute(
+            f"UPDATE services SET {column} = ? WHERE id = ?", (value, service_id)
+        )
+        await db.commit()
+
+
+async def toggle_service(service_id: int) -> None:
+    async with connect() as db:
+        await db.execute(
+            "UPDATE services SET is_active = 1 - is_active WHERE id = ?",
+            (service_id,),
+        )
+        await db.commit()
+
+
+# ---------- расписание (админ) ----------
+async def get_working_hours() -> list[dict]:
+    async with connect() as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT weekday, start_time, end_time, is_day_off "
+            "FROM working_hours ORDER BY weekday"
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+async def set_working_hours(weekday: int, start: str, end: str) -> None:
+    async with connect() as db:
+        await db.execute(
+            "UPDATE working_hours SET start_time = ?, end_time = ?, is_day_off = 0 "
+            "WHERE weekday = ?",
+            (start, end, weekday),
+        )
+        await db.commit()
+
+
+async def toggle_weekday(weekday: int) -> bool:
+    """Переключает выходной/рабочий. Возвращает True, если день стал выходным."""
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT is_day_off FROM working_hours WHERE weekday = ?", (weekday,)
+        )
+        is_off = (await cur.fetchone())[0]
+        if is_off:
+            # включаем день; если часов нет, ставим стандартные
+            await db.execute(
+                "UPDATE working_hours SET is_day_off = 0, "
+                "start_time = COALESCE(start_time, '10:00'), "
+                "end_time = COALESCE(end_time, '20:00') WHERE weekday = ?",
+                (weekday,),
+            )
+        else:
+            await db.execute(
+                "UPDATE working_hours SET is_day_off = 1 WHERE weekday = ?",
+                (weekday,),
+            )
+        await db.commit()
+        return not is_off
+
+
+async def count_future_bookings_on_weekday(weekday: int) -> int:
+    today = now_local().date().isoformat()
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT date FROM bookings WHERE status = 'active' AND date >= ?",
+            (today,),
+        )
+        return sum(
+            1 for (d,) in await cur.fetchall()
+            if date.fromisoformat(d).weekday() == weekday
+        )
+
+
+async def get_future_days_off() -> list[date]:
+    today = now_local().date().isoformat()
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT date FROM days_off WHERE date >= ? ORDER BY date", (today,)
+        )
+        return [date.fromisoformat(d) for (d,) in await cur.fetchall()]
+
+
+async def add_day_off(day: date) -> None:
+    async with connect() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO days_off (date) VALUES (?)", (day.isoformat(),)
+        )
+        await db.commit()
+
+
+async def remove_day_off(day: date) -> None:
+    async with connect() as db:
+        await db.execute("DELETE FROM days_off WHERE date = ?", (day.isoformat(),))
+        await db.commit()

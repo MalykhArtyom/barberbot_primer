@@ -14,6 +14,7 @@ from services import (
     get_available_dates, get_free_slots,
     create_booking, SlotTaken, LimitReached,
 )
+import html
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -107,13 +108,14 @@ async def choose_time(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 # ---------- имя ----------
+
 @router.message(Booking.name, F.text)
 async def enter_name(message: Message, state: FSMContext):
-    name = message.text.strip()
-    if not 2 <= len(name) <= 40:
+    raw = message.text.strip()
+    if not 2 <= len(raw) <= 40:
         await message.answer("Имя должно быть от 2 до 40 символов. Попробуй ещё раз.")
         return
-    await state.update_data(client_name=name)
+    await state.update_data(client_name=html.escape(raw))
     await state.set_state(Booking.phone)
     await message.answer(
         "📱 <b>Номер телефона для связи:</b>\n"
