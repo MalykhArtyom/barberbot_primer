@@ -12,7 +12,8 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer(
         texts.WELCOME.format(name=message.from_user.first_name),
         reply_markup=kb.main_menu(),

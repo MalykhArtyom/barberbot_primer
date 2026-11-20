@@ -4,6 +4,8 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from config import config
 
+import aiosqlite
+
 TZ = ZoneInfo(config.timezone)
 SLOT_STEP_MIN = 30   # шаг сетки слотов
 MIN_LEAD_MIN = 60    # минимум минут до визита
@@ -99,3 +101,69 @@ def _to_min(t: str) -> int:
 
 def _to_str(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+MAX_ACTIVE_BOOKINGS = 3
+
+
+class SlotTaken(Exception):
+    """Слот уже занят или недоступен."""
+
+
+class LimitReached(Exception):
+    """У клиента слишком много активных записей."""
+
+
+async def create_booking(
+    user_id: int, service_id: int, day: date, time_: str,
+    name: str, phone: str,
+) -> int:
+    service = await get_service(service_id)
+    if not service:
+        raise SlotTaken
+
+    # слот должен быть в актуальной сетке (рабочие часы, запас по времени и т.д.)
+    if time_ not in await get_free_slots(day, service_id):
+        raise SlotTaken
+
+    new_start = _to_min(time_)
+    new_end = new_start + service["duration_min"]
+
+    async with connect() as db:
+        # BEGIN IMMEDIATE блокирует запись для других, пока идёт проверка
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cur = await db.execute(
+                "SELECT COUNT(*) FROM bookings "
+                "WHERE user_id = ? AND status = 'active' AND date >= ?",
+                (user_id, now_local().date().isoformat()),
+            )
+            if (await cur.fetchone())[0] >= MAX_ACTIVE_BOOKINGS:
+                raise LimitReached
+
+            cur = await db.execute(
+                "SELECT b.time, s.duration_min "
+                "FROM bookings b JOIN services s ON s.id = b.service_id "
+                "WHERE b.date = ? AND b.status = 'active'",
+                (day.isoformat(),),
+            )
+            for t, d in await cur.fetchall():
+                start = _to_min(t)
+                if not (new_end <= start or new_start >= start + d):
+                    raise SlotTaken
+
+            cur = await db.execute(
+                "INSERT INTO bookings "
+                "(user_id, service_id, date, time, client_name, phone) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, service_id, day.isoformat(), time_, name, phone),
+            )
+            booking_id = cur.lastrowid
+            await db.commit()
+            return booking_id
+        except aiosqlite.IntegrityError:
+            await db.rollback()
+            raise SlotTaken
+        except BaseException:
+            await db.rollback()
+            raise

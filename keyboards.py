@@ -1,6 +1,6 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
+from datetime import date
 
 def main_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
@@ -17,7 +17,6 @@ def back_to_menu() -> InlineKeyboardMarkup:
     kb.button(text="⬅️ В меню", callback_data="menu:main")
     return kb.as_markup()
 
-from datetime import date
 
 WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
@@ -58,4 +57,29 @@ def times_kb(slots: list[str]) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="⬅️ Назад", callback_data="back:dates"),
         InlineKeyboardButton(text="✖️ Отмена", callback_data="menu:main"),
     )
+    return kb.as_markup()
+
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
+
+def cancel_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✖️ Отмена", callback_data="menu:main")
+    return kb.as_markup()
+
+
+def phone_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📱 Поделиться номером", request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Или введи номер вручную",
+    )
+
+
+def confirm_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Подтвердить", callback_data="confirm:yes")
+    kb.button(text="✖️ Отмена", callback_data="menu:main")
+    kb.adjust(2)
     return kb.as_markup()
